@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python:*)",
+      "Bash(streamlit run:*)",
+      "Bash(pip install:*)",
+      "Bash(move app.py srcapp.py)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
