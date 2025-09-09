@@ -1,0 +1,27 @@
+{
+  "processing_date": "2025-09-09T20:10:46.724829",
+  "brands_processed": [
+    "FAW",
+    "HINO",
+    "ISUZU",
+    "MERCEDES_BENZ",
+    "SCANIA",
+    "TATA_MOTORS",
+    "TOYOTA",
+    "UD_TRUCKS"
+  ],
+  "files_processed": [
+    "2022/04/FAW.xlsx",
+    "2022/04/HINO.xlsx",
+    "2022/04/ISUZU.xlsx",
+    "2022/04/MERCEDES_BENZ.xlsx",
+    "2022/04/SCANIA.xlsx",
+    "2022/04/TATA_MOTORS.xlsx",
+    "2022/04/TOYOTA.xlsx",
+    "2022/04/UD_TRUCKS.xlsx"
+  ],
+  "total_records": 1801,
+  "detailed_records": 1505,
+  "summary_records": 296,
+  "errors": []
+}

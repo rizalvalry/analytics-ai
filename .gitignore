@@ -1,3 +1,4 @@
 # Ignore environment config
 config/.env
 *.env
+.claude
