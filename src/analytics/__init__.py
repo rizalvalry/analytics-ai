@@ -1,1 +1,0 @@
-# Analytics package for GAIKINDO Sales Analysis Platform

@@ -4,7 +4,9 @@
       "Bash(python:*)",
       "Bash(streamlit run:*)",
       "Bash(pip install:*)",
-      "Bash(move app.py srcapp.py)"
+      "Bash(move app.py srcapp.py)",
+      "Bash(curl:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
