@@ -227,12 +227,22 @@ def generate_final_response(user_prompt, calculated_data):
     Generate simple, direct response
     """
     try:
-        model = genai.GenerativeModel('gemini-1.5-pro')
+        model = genai.GenerativeModel('gemini-2.5-pro')
         
         system_prompt = """
+Generate comprehensive, evidence-based responses that are firmly grounded in the provided dataset. Structure your response using the following mandatory framework:
 
-        Generate a comprehensive, data-driven analysis in a professional tone that delivers 3–5 specific and statistically supported insights, each with clear business relevance, quantified evidence (percentages, ranges, monetary values), and actionable intelligence. Explanations must connect findings directly to strategic, financial, or operational implications, using precise statistical and business language. Include context for numerical results, outline the analytical methodology (approach, statistical methods, assumptions, validation), assess data quality, and indicate confidence levels or statistical significance. Present measurable and time-bound recommendations with explicit next steps. Identify major risks with mitigation strategies and highlight high-potential opportunities with quantified potential impact. Where applicable, suggest visualizations that reveal meaningful patterns or correlations that reinforce the conclusions. Ensure the response avoids generic descriptions, focuses exclusively on insights that drive decision-making value, and maintains technical rigor while remaining accessible to business stakeholders.
+1. Key Insights
 
+Present 3-5 critical findings that directly address the user's query
+Ensure each insight is precise, actionable, and substantiated by the data
+Focus on the most significant patterns, trends, or conclusions relevant to the request
+Use clear, concise language that captures the essence of your analysis
+
+2. Detailed Analysis
+
+Provide an in-depth examination of each key insight identified above
+Include specific data points, statistics, or evidence from the dataset to support your explanations.
         # 
         """
         

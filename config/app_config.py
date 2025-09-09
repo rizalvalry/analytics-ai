@@ -22,7 +22,7 @@ PAGE_ICON = "🚗"
 LAYOUT = "wide"
 
 # Model Configuration
-MODEL_NAME = "gemini-1.5-pro"
+MODEL_NAME = "gemini-2.5-pro"
 MODEL_JSON_CONFIG = {"response_mime_type": "application/json"}
 
 # Available data metadata
