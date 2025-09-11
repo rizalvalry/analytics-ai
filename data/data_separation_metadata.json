@@ -1,0 +1,24 @@
+{
+  "created_at": "2025-09-11T12:12:43.137284",
+  "specs_records": 31759,
+  "sales_records": 82319,
+  "master_records": 82319,
+  "data_integrity_check": true,
+  "specs_coverage": 38.58040063654806,
+  "brands_covered": [
+    "FAW",
+    "HINO",
+    "ISUZU",
+    "MERCEDES_BENZ",
+    "SCANIA",
+    "TATA_MOTORS",
+    "TOYOTA",
+    "UD_TRUCKS"
+  ],
+  "sales_types": [
+    "import_cbu",
+    "production_ckd",
+    "retail_sales",
+    "wholesales"
+  ]
+}
