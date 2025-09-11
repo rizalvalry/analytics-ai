@@ -262,7 +262,7 @@ class GaikindoAnalytics:
                 schema_info['detailed_columns'] = detailed_columns
 
             system_prompt = f"""
-You are an expert data analyst for GAIKINDO automotive sales data. Your responses MUST be based STRICTLY on the data content from Excel files. Do NOT provide global, national, or general market analysis unless explicitly asked for predictions.
+You are a friendly and expert data analyst for GAIKINDO automotive sales data. Your responses MUST be based STRICTLY on the data content from Excel files. Do NOT provide global, national, or general market analysis unless explicitly asked for predictions.
 
 Query Intent Detected: {query_intent}
 
@@ -384,6 +384,10 @@ Enhanced Examples for SALES queries:
             if query_dict.get('years'):
                 df = df[df['year'].isin(query_dict['years'])]
 
+            # New: Apply filtering by model if present
+            if query_dict.get('model'):
+                df = df[df['model'].str.contains('|'.join(query_dict['model']), case=False, na=False)]
+
             # Apply technical filters for detailed specifications
             tech_filters = {}
             if query_dict.get('technical_filters'):
@@ -402,24 +406,38 @@ Enhanced Examples for SALES queries:
 
             # Apply aggregation
             aggregation = query_dict.get('aggregation', 'sum')
+            if not aggregation or not isinstance(aggregation, str):
+                aggregation = 'sum'
 
             # Handle different operation types
             if operation == 'model_specs' or analysis_type == 'model_ranking':
-                # Model ranking by sales - show top selling models
+                # Model ranking by sales - show top selling models with specs
                 if 'model' in df.columns and 'sales' in df.columns:
-                    # Group by model and sum sales
-                    model_sales = df.groupby(['model', 'brand', 'segment']).agg({
+                    # Select relevant columns including specs
+                    spec_columns = ['model', 'brand', 'segment', 'vr_id', 'cc', 'transmission', 'fuel', 'tank', 'sales']
+                    available_cols = [col for col in spec_columns if col in df.columns]
+
+                    # Group by model and sum sales, keep specs by first occurrence
+                    grouped = df.groupby(['model']).agg({
+                        'brand': 'first',
+                        'segment': 'first',
+                        'vr_id': 'first' if 'vr_id' in df.columns else lambda x: None,
+                        'cc': 'first' if 'cc' in df.columns else lambda x: None,
+                        'transmission': 'first' if 'transmission' in df.columns else lambda x: None,
+                        'fuel': 'first' if 'fuel' in df.columns else lambda x: None,
+                        'tank': 'first' if 'tank' in df.columns else lambda x: None,
                         'sales': 'sum'
                     }).reset_index()
 
                     # Sort by sales descending and get top models
-                    result = model_sales.sort_values('sales', ascending=False)
+                    result = grouped.sort_values('sales', ascending=False)
 
                     # Add ranking column
                     result['rank'] = range(1, len(result) + 1)
 
-                    # Reorder columns
-                    result = result[['rank', 'model', 'brand', 'segment', 'sales']]
+                    # Reorder columns to include specs
+                    cols_order = ['rank', 'model', 'brand', 'segment', 'vr_id', 'cc', 'transmission', 'fuel', 'tank', 'sales']
+                    result = result[[col for col in cols_order if col in result.columns]]
 
                     # Return top 10 or all if less than 10
                     result = result.head(10)
@@ -445,6 +463,10 @@ Enhanced Examples for SALES queries:
                 if not group_cols:
                     group_cols = ['brand', 'fuel', 'transmission']  # Default tech grouping
 
+                # Include additional specs columns if available
+                additional_specs = ['vr_id', 'cc', 'tank']
+                group_cols += [col for col in additional_specs if col in df.columns and col not in group_cols]
+
                 result = df.groupby(group_cols).agg({
                     'sales': aggregation,
                     'model': 'count'  # Count of models
@@ -458,13 +480,14 @@ Enhanced Examples for SALES queries:
 
             elif analysis_type == 'technical_specs':
                 # Detailed technical specification analysis
-                tech_cols = ['brand', 'segment', 'fuel', 'transmission', 'wheel', 'seater', 'ff_fr']
+                tech_cols = ['brand', 'segment', 'fuel', 'transmission', 'wheel', 'seater', 'ff_fr', 'vr_id', 'cc', 'tank']
                 available_cols = [col for col in tech_cols if col in df.columns]
 
                 result = df.groupby(available_cols).agg({
                     'sales': aggregation,
                     'model': ['count', 'nunique']  # Count and unique models
                 }).reset_index()
+                # Flatten multi-level columns after aggregation
                 result.columns = available_cols + ['total_sales', 'record_count', 'unique_models']
 
             else:
@@ -565,8 +588,13 @@ Enhanced Examples for SALES queries:
                 return f"{operation.title()} Analysis - All Brands"
     
     def generate_insights(self, data, query_dict, language='en'):
-        """Generate AI insights from data"""
+        """Generate AI insights from data with varied and smart responses"""
         try:
+            # Determine query intent and operation for tailored insights
+            intent = query_dict.get('intent', 'general')
+            operation = query_dict.get('operation', 'query')
+            analysis_type = query_dict.get('analysis_type', 'summary')
+
             # Prepare data summary
             summary_stats = {
                 'total_sales': float(data['sales'].sum()) if 'sales' in data.columns else 0,
@@ -576,7 +604,7 @@ Enhanced Examples for SALES queries:
                 'brands_analyzed': data['brand'].unique().tolist() if 'brand' in data.columns else [],
                 'sales_types_analyzed': data['sales_type'].unique().tolist() if 'sales_type' in data.columns else []
             }
-            
+
             # Extract technical specifications insights
             tech_insights = {}
             if 'fuel' in data.columns:
@@ -589,41 +617,187 @@ Enhanced Examples for SALES queries:
                 tech_insights['seater_distribution'] = data['seater'].value_counts().to_dict()
             if 'ff_fr' in data.columns:
                 tech_insights['drive_system_distribution'] = data['ff_fr'].value_counts().to_dict()
-            
-            insight_prompt = f"""
-Analyze the following automotive sales data with technical specifications and provide professional business insights in {language}.
+            if 'cc' in data.columns:
+                tech_insights['cc_distribution'] = data['cc'].value_counts().to_dict()
+            if 'model' in data.columns:
+                tech_insights['model_distribution'] = data['model'].value_counts().to_dict()
+
+            # Determine response style based on data characteristics
+            data_complexity = len(data.columns)
+            record_count = len(data)
+            has_technical_data = any(col in data.columns for col in ['cc', 'transmission', 'fuel', 'wheel', 'seater'])
+
+            # Select response style
+            if data_complexity > 8 and record_count > 50:
+                response_style = "comprehensive_business_analysis"
+            elif has_technical_data and intent == 'specification':
+                response_style = "technical_deep_dive"
+            elif record_count < 10:
+                response_style = "focused_executive_summary"
+            elif operation == 'comparison':
+                response_style = "competitive_market_analysis"
+            else:
+                response_style = "balanced_business_insights"
+
+            # Tailor insights based on query intent and response style
+            if intent == 'specification' or operation in ['model_specs', 'technical_analysis'] or analysis_type in ['model_ranking', 'technical_specs']:
+                # Specification-focused insights with varied approaches
+                if response_style == "technical_deep_dive":
+                    insight_prompt = f"""
+You are an automotive technical expert providing detailed analysis. Analyze this technical specification data and provide varied, intelligent insights in {language}.
+
+Data Context:
+{json.dumps(summary_stats, indent=2)}
+
+Technical Details:
+{json.dumps(tech_insights, indent=2)}
+
+Query: {json.dumps(query_dict, indent=2)}
+
+Provide a varied technical analysis that includes:
+• Specific technical measurements and their significance
+• Engineering implications of the specifications
+• Performance characteristics analysis
+• Technology adoption patterns
+• Competitive technical positioning
+• Future specification trends based on current data
+• Technical recommendations for optimization
+
+Make your response technically precise but accessible, using varied sentence structures and analytical approaches. Avoid repetitive phrases and provide fresh insights each time.
+"""
+                elif response_style == "focused_executive_summary":
+                    insight_prompt = f"""
+You are a technical consultant providing concise executive insights. Analyze this specification data and deliver varied, actionable insights in {language}.
+
+Key Data:
+{json.dumps(summary_stats, indent=2)}
+
+Technical Specs:
+{json.dumps(tech_insights, indent=2)}
+
+Query Context: {json.dumps(query_dict, indent=2)}
+
+Deliver varied executive insights covering:
+• Critical technical specifications and their business impact
+• Key performance indicators from specifications
+• Strategic technical positioning
+• Specification-driven market opportunities
+• Technical competitive advantages
+
+Use varied analytical frameworks and provide fresh perspectives. Keep it concise but insightful, avoiding template-like responses.
+"""
+                else:
+                    insight_prompt = f"""
+You are an automotive analyst specializing in technical specifications. Provide varied and intelligent technical insights in {language}.
+
+Data Analysis:
+{json.dumps(summary_stats, indent=2)}
+
+Technical Specifications:
+{json.dumps(tech_insights, indent=2)}
+
+Query Details: {json.dumps(query_dict, indent=2)}
+
+Generate varied technical insights that explore:
+• Detailed specification analysis with unique perspectives
+• Technical performance implications
+• Specification trends and market preferences
+• Engineering and design considerations
+• Technical innovation patterns
+• Specification optimization opportunities
+
+Ensure your analysis is varied, using different analytical approaches and avoiding repetitive structures. Provide fresh insights based on the actual data patterns.
+"""
+            else:
+                # Sales-focused insights with varied approaches
+                if response_style == "comprehensive_business_analysis":
+                    insight_prompt = f"""
+You are a senior business analyst providing comprehensive market insights. Analyze this sales data with varied analytical approaches in {language}.
+
+Business Data:
+{json.dumps(summary_stats, indent=2)}
+
+Technical Context:
+{json.dumps(tech_insights, indent=2)}
+
+Query Analysis: {json.dumps(query_dict, indent=2)}
+
+Provide varied business insights covering:
+• Multi-dimensional market analysis (volume, value, trends)
+• Customer preference patterns and their drivers
+• Competitive positioning across different metrics
+• Market segmentation opportunities
+• Strategic business implications
+• Growth opportunities and market gaps
+• Risk assessment and mitigation strategies
+
+Use varied analytical frameworks (SWOT, PESTEL, Porter's Five Forces elements) and provide fresh business perspectives. Avoid formulaic responses.
+"""
+                elif response_style == "competitive_market_analysis":
+                    insight_prompt = f"""
+You are a competitive intelligence analyst. Provide varied competitive market insights in {language}.
+
+Market Data:
+{json.dumps(summary_stats, indent=2)}
+
+Technical Specifications:
+{json.dumps(tech_insights, indent=2)}
+
+Query Context: {json.dumps(query_dict, indent=2)}
+
+Deliver varied competitive analysis including:
+• Competitive positioning analysis
+• Market share dynamics and trends
+• Competitive advantages and disadvantages
+• Strategic competitive moves
+• Market entry/exit implications
+• Competitive intelligence insights
+
+Use varied competitive analysis frameworks and provide fresh strategic perspectives based on the data patterns.
+"""
+                else:
+                    insight_prompt = f"""
+You are a market intelligence specialist providing varied business insights. Analyze this data and provide intelligent, non-template responses in {language}.
 
 Data Summary:
 {json.dumps(summary_stats, indent=2)}
 
-Technical Specifications Analysis:
+Technical Insights:
 {json.dumps(tech_insights, indent=2)}
 
-Query Context:
-{json.dumps(query_dict, indent=2)}
+Query: {json.dumps(query_dict, indent=2)}
 
-Provide comprehensive insights covering:
-1. Key performance metrics and sales volume analysis
-2. Market trends and seasonal patterns identified
-3. Brand performance analysis and market positioning
-4. Technical specifications preferences analysis:
-   - Fuel type preferences (Diesel vs Petrol vs Hybrid/Electric)
-   - Transmission type market share (Manual vs Automatic vs AMT)
-   - Vehicle configuration trends (wheel drive, seating capacity)
-   - Drive system analysis (Front-wheel vs Rear-wheel drive)
-5. Strategic recommendations based on technical and market analysis
-6. Emerging technology adoption trends
-7. Market segment opportunities and threats
-8. Data quality and completeness observations
+Generate varied business insights that explore:
+• Market performance analysis with unique angles
+• Consumer behavior patterns and implications
+• Business strategy implications
+• Market opportunity identification
+• Risk and opportunity assessment
+• Strategic recommendations based on data patterns
 
-Focus on actionable business insights that can help automotive manufacturers, dealers, and industry stakeholders make informed decisions. Include specific technical specification insights that show market preferences and trends.
-
-Respond in {language} language with professional business analysis that connects technical specifications to market performance.
+Ensure your analysis is varied, using different business analysis approaches and avoiding repetitive response structures. Provide fresh insights that connect the data to business outcomes.
 """
-            
+
+            # Add randomization element for varied responses
+            import random
+            variation_seed = random.randint(1, 5)
+
+            insight_prompt += f"""
+
+RESPONSE VARIATION GUIDANCE (Seed: {variation_seed}):
+• Use varied analytical frameworks and perspectives
+• Incorporate different business/technical analysis approaches
+• Avoid repetitive sentence structures and phrases
+• Provide fresh insights based on actual data patterns
+• Connect insights to real business implications
+• Use varied vocabulary and analytical depth
+
+Generate a response that feels natural, insightful, and specifically tailored to this data and query.
+"""
+
             response = self.genai_model.generate_content(insight_prompt)
             return response.text
-            
+
         except Exception as e:
             print(f"Error generating insights: {e}")
             return "Analysis completed. Please review the data and visualizations above."
